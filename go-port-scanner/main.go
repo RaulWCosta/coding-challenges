@@ -12,15 +12,22 @@ import (
 )
 
 const pow_2_16 = 65536
-type Msg struct{int; bool}
 
-func validate_host_and_port(host string, port int) error {
+type Msg struct {
+	int
+	bool
+}
+
+func validate_args(host string, port int) error {
 	if host == "" {
 		return fmt.Errorf("`--host` not set")
 	}
-	// if port == 0 {
-		// return fmt.Errorf("`--port` not set")
-	// }
+	if port != 0 {
+		if port < 1 || port >= pow_2_16 {
+			return fmt.Errorf("`--port` value must be between 1 and %d", pow_2_16-1)
+		}
+
+	}
 	return nil
 }
 
@@ -29,21 +36,23 @@ func scan_port(host string, port int, timeout int, wg *sync.WaitGroup, msgChan c
 	defer wg.Done()
 
 	address := fmt.Sprintf("%s:%d", host, port)
-	to_duration, err := time.ParseDuration(fmt.Sprintf("%dms", timeout)); if err != nil {
+	to_duration, err := time.ParseDuration(fmt.Sprintf("%dms", timeout))
+	if err != nil {
 		msgChan <- Msg{port, false}
-		return 
+		return
 	}
-	conn, err := net.DialTimeout("tcp", address, to_duration); if err != nil {
+	conn, err := net.DialTimeout("tcp", address, to_duration)
+	if err != nil {
 		// fmt.Printf("%d", port)
 		msgChan <- Msg{port, false}
-		return 
+		return
 	}
 	defer conn.Close()
 
 	n, err := conn.Write([]byte("0"))
 	if n == 0 || err != nil {
 		msgChan <- Msg{port, false}
-		return 
+		return
 	}
 	msgChan <- Msg{port, true}
 }
@@ -58,8 +67,8 @@ func print_open_ports(port int, wg *sync.WaitGroup, msgChan <-chan Msg) {
 				fmt.Printf("\nPort: %d is open\n", pair.int)
 			}
 		}
-	}  else {
-		pair := <- msgChan
+	} else {
+		pair := <-msgChan
 		if pair.bool {
 			fmt.Printf("\nPort: %d is open\n", pair.int)
 		}
@@ -72,40 +81,45 @@ func main() {
 	var timeout int
 
 	app := &cli.App{
-		Name: "myps",
+		Name:        "myps",
 		Description: "My Port Scanner",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name: "host",
-				Usage: "Host",
-				Value: "localhost",
+				Name:        "host",
+				Aliases:     []string{"h"},
+				Usage:       "Host",
+				Value:       "localhost",
 				Destination: &host,
 			},
 			&cli.IntFlag{
-				Name: "port",
-				Usage: "Port",
+				Name:    "port",
+				Aliases: []string{"p"},
+				Usage:   "Port",
 				// Value: 8000,
+				DefaultText: "All ports",
 				Destination: &port,
 			},
 			&cli.IntFlag{
-				Name: "timeout (ms)",
-				Value: 100,
+				Name:        "timeout (ms)",
+				Aliases:     []string{"t"},
+				Value:       100,
 				Destination: &timeout,
 			},
 			cli.HelpFlag,
 		},
-        Action: func(cCtx *cli.Context) error {
+		Action: func(cCtx *cli.Context) error {
 			var wg sync.WaitGroup
 			msgChan := make(chan Msg, pow_2_16)
 
-			err := validate_host_and_port(host, port); if err != nil {
-				fmt.Printf(err.Error())
+			err := validate_args(host, port)
+			if err != nil {
+				fmt.Printf("Error: " + err.Error())
 				return nil
 			}
 			if port == 0 {
-				wg.Add(pow_2_16-1)
+				wg.Add(pow_2_16 - 1)
 				for i := 1; i < pow_2_16; i++ {
-					go scan_port(host, i, timeout, &wg, msgChan)		
+					go scan_port(host, i, timeout, &wg, msgChan)
 				}
 			} else {
 				wg.Add(1)
@@ -113,11 +127,11 @@ func main() {
 			}
 			print_open_ports(port, &wg, msgChan)
 
-            return nil
-        },
+			return nil
+		},
 	}
-	
-    if err := app.Run(os.Args); err != nil {
-        log.Fatal(err)
-    }
+
+	if err := app.Run(os.Args); err != nil {
+		log.Fatal(err)
+	}
 }
