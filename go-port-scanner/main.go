@@ -19,7 +19,6 @@ type Msg struct {
 }
 
 func scanPort(host string, port int, timeout int, wg *sync.WaitGroup, msgChan chan<- Msg) {
-	fmt.Printf("Scanning host %q port %d\n", host, port)
 	defer wg.Done()
 
 	address := net.JoinHostPort(host, fmt.Sprintf("%d", port))
