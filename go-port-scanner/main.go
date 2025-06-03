@@ -102,11 +102,13 @@ func main() {
 				if port == 0 {
 					for i := 1; i < pow_2_16; i++ {
 						go scanPort(host, i, msgChan)
-						go printOpenPort(msgChan)
+					}
+					for len(msgChan) > 0 {
+						printOpenPort(msgChan)
 					}
 				} else {
 					go scanPort(host, port, msgChan)
-					go printOpenPort(msgChan) // TODO fix, this is not printing
+					printOpenPort(msgChan) // Call synchronously to ensure output
 				}
 			}
 
