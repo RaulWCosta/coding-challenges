@@ -5,10 +5,10 @@ import (
 	"log"
 	"net"
 	"os"
-	"sync"
-	"time"
+	"syscall"
 
 	"github.com/urfave/cli/v2" // imports as package "cli"
+	"golang.org/x/sys/unix"
 )
 
 const pow_2_16 = 65536
@@ -18,45 +18,46 @@ type Msg struct {
 	bool
 }
 
-func scanPort(host string, port int, timeout int, wg *sync.WaitGroup, msgChan chan<- Msg) {
-	defer wg.Done()
-
+func scanPort(host string, port int, msgChan chan<- Msg) {
 	address := net.JoinHostPort(host, fmt.Sprintf("%d", port))
-	to_duration, err := time.ParseDuration(fmt.Sprintf("%dms", timeout))
+	tAddr, err := net.ResolveTCPAddr("tcp", address)
 	if err != nil {
-		msgChan <- Msg{port, false}
-		return
+		log.Fatalf("Can not resolve '%s': %s", address, err)
 	}
-	conn, err := net.DialTimeout("tcp", address, to_duration)
-	if err != nil {
-		msgChan <- Msg{port, false}
-		return
-	}
-	defer conn.Close()
 
-	n, err := conn.Write([]byte("0"))
-	if n == 0 || err != nil {
+	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_STREAM, 0)
+	if err != nil {
 		msgChan <- Msg{port, false}
 		return
 	}
-	msgChan <- Msg{port, true}
+	defer func() {
+		if cerr := unix.Close(fd); cerr != nil {
+			log.Printf("Error closing socket: %s", cerr)
+		}
+	}()
+
+	var sAddr unix.Sockaddr
+
+	if ip := tAddr.IP.To4(); ip != nil {
+		var addr4 [net.IPv4len]byte
+		copy(addr4[:], ip)
+		sAddr = &unix.SockaddrInet4{Port: tAddr.Port, Addr: addr4}
+	}
+
+	if success, err := connect(fd, sAddr); err != nil {
+		msgChan <- Msg{port, false}
+		return
+	} else if success {
+		msgChan <- Msg{port, true}
+		return
+	}
+	msgChan <- Msg{port, false} // Ensure we always send a message to avoid deadlock
 }
 
-func printOpenPorts(port int, wg *sync.WaitGroup, msgChan <-chan Msg) {
-	wg.Wait()
-
-	if port == 0 {
-		for i := 1; i < pow_2_16; i++ {
-			pair := <-msgChan
-			if pair.bool {
-				fmt.Printf("\nPort: %d is open\n", pair.int)
-			}
-		}
-	} else {
-		pair := <-msgChan
-		if pair.bool {
-			fmt.Printf("\nPort: %d is open\n", pair.int)
-		}
+func printOpenPort(msgChan <-chan Msg) {
+	pair := <-msgChan
+	if pair.bool {
+		fmt.Printf("\nPort: %d is open\n", pair.int)
 	}
 }
 
@@ -95,24 +96,19 @@ func main() {
 			cli.HelpFlag,
 		},
 		Action: func(cCtx *cli.Context) error {
-			var wg sync.WaitGroup
-			msgChan := make(chan Msg, pow_2_16)
+			msgChan := make(chan Msg, 100)
 
-			if port == 0 {
-				// scan all ports
-				for _, host := range hosts {
-					wg.Add(pow_2_16 - 1)
+			for _, host := range hosts {
+				if port == 0 {
 					for i := 1; i < pow_2_16; i++ {
-						go scanPort(host, i, timeout, &wg, msgChan)
+						go scanPort(host, i, msgChan)
+						go printOpenPort(msgChan)
 					}
-				}
-			} else {
-				for _, host := range hosts {
-					wg.Add(1)
-					go scanPort(host, port, timeout, &wg, msgChan)
+				} else {
+					go scanPort(host, port, msgChan)
+					go printOpenPort(msgChan) // TODO fix, this is not printing
 				}
 			}
-			printOpenPorts(port, &wg, msgChan)
 
 			return nil
 		},

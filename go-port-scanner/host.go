@@ -26,9 +26,7 @@ func resolveHosts(hosts string) []string {
 
 	for _, host := range splitted_hosts {
 		host = strings.TrimSpace(host)
-		for _, v := range resolveHost(host) {
-			resolved_hosts = append(resolved_hosts, v)
-		}
+		resolved_hosts = append(resolved_hosts, resolveHost(host)...)
 	}
 	return resolved_hosts
 }
