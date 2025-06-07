@@ -26,6 +26,6 @@ go.work.sum
 
 port-scan-exe
 
-.zigcache/
+.zig-cache/
 zig-out/
 .vscode/

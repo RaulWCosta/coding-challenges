@@ -1,38 +1,79 @@
 const std = @import("std");
 const rl = @import("raylib");
 const Barrier = @import("barrier.zig").Barrier;
+const alien = @import("alien.zig");
+
+const SCREEN_WIDTH: i32 = 1120;
+const SCREEN_HEIGHT: i32 = 800;
+const SPEED_SHIP: i32 = 10;
 
 fn drawTopMenu(score: [:0]const u8) void {
+    const menu_height: i32 = @divFloor(SCREEN_HEIGHT, 11);
+    const menu_width: i32 = SCREEN_WIDTH;
+    const font_size: i32 = @divFloor(menu_height, 2);
+
     // Draw top menu
-    rl.drawRectangle(0, 0, rl.getScreenWidth(), 40, .black);
-    rl.drawText("SCORE", 80, 10, 20, .white);
+    rl.drawRectangle(0, 0, menu_width, menu_height, .black);
+    rl.drawText(
+        "SCORE",
+        @divFloor(menu_width, 5),
+        @divFloor(menu_height, 2) - 10,
+        font_size,
+        .white,
+    );
 
-    rl.drawText(score, 160, 10, 20, .green);
+    rl.drawText(
+        score,
+        @divFloor(menu_width, 5) + 90,
+        @divFloor(menu_height, 2) - 10,
+        font_size,
+        .green,
+    );
 
-    std.debug.print("", .{});
+    const half = @divFloor(menu_width, 2);
 
-    const half = @divFloor(rl.getScreenWidth(), 2);
+    rl.drawText(
+        "LIVES",
+        half + 30,
+        @divFloor(menu_height, 2) - 10,
+        font_size,
+        .white,
+    );
 
-    rl.drawText("LIVES", half + 30, 10, 20, .white);
-
-    rl.drawRectangle(half + 110, 10, 20, 20, .green);
-    rl.drawRectangle(half + 140, 10, 20, 20, .green);
-    rl.drawRectangle(half + 170, 10, 20, 20, .green);
+    const x_pos_first_life: i32 = half + 140;
+    rl.drawRectangle(
+        x_pos_first_life,
+        @divFloor(menu_height, 2) - 10,
+        20,
+        20,
+        .green,
+    );
+    rl.drawRectangle(
+        x_pos_first_life + 30,
+        @divFloor(menu_height, 2) - 10,
+        20,
+        20,
+        .green,
+    );
+    rl.drawRectangle(
+        x_pos_first_life + 60,
+        @divFloor(menu_height, 2) - 10,
+        20,
+        20,
+        .green,
+    );
 }
 
 pub fn main() anyerror!void {
     // Initialization
     //--------------------------------------------------------------------------------------
-    const screenWidth = 800;
-    const screenHeight = 450;
-    const speed = 8;
 
     // const config_flags = rl.ConfigFlags{ .window_resizable = true };
 
     // rl.setConfigFlags(config_flags);
     rl.initWindow(
-        screenWidth,
-        screenHeight,
+        SCREEN_WIDTH,
+        SCREEN_HEIGHT,
         "raylib-zig [core] example - basic window",
     );
     defer rl.closeWindow(); // Close window and OpenGL context
@@ -43,12 +84,24 @@ pub fn main() anyerror!void {
     var xPosition: i32 = 400;
     const spaceshipTexture = try rl.loadTexture("assets/player.png");
     defer rl.unloadTexture(spaceshipTexture); // Unload spaceship texture
-    const barriers: [4]Barrier = .{
-        Barrier.init(50, 300),
-        Barrier.init(250, 300),
-        Barrier.init(450, 300),
-        Barrier.init(650, 300),
+
+    // Barriers
+    const n_barriers: i32 = 5;
+    const barrier_y_start: i32 = @floor(@as(f32, SCREEN_HEIGHT) * 0.75);
+    const barrier_x_gap: i32 = @divFloor(SCREEN_WIDTH, n_barriers);
+    const barrier_x_start = 60;
+
+    const barriers: [n_barriers]Barrier = .{
+        Barrier.init(barrier_x_start, barrier_y_start),
+        Barrier.init(barrier_x_start + barrier_x_gap, barrier_y_start),
+        Barrier.init(barrier_x_start + 2 * barrier_x_gap, barrier_y_start),
+        Barrier.init(barrier_x_start + 3 * barrier_x_gap, barrier_y_start),
+        Barrier.init(barrier_x_start + 4 * barrier_x_gap, barrier_y_start),
     };
+
+    // Aliens
+    var alien_swarm = try alien.AlienSwarm.init();
+    defer alien_swarm.deinit(); // Cleanup aliens
 
     // Main game loop
     while (!rl.windowShouldClose()) { // Detect window close button or ESC key
@@ -59,11 +112,11 @@ pub fn main() anyerror!void {
 
         if (rl.isKeyDown(rl.KeyboardKey.left)) {
             if (xPosition > 60) {
-                xPosition -= speed;
+                xPosition -= SPEED_SHIP;
             }
         } else if (rl.isKeyDown(rl.KeyboardKey.right)) {
-            if (xPosition < screenWidth - 120) {
-                xPosition += speed;
+            if (xPosition < SCREEN_WIDTH - 130) {
+                xPosition += SPEED_SHIP;
             }
         }
 
@@ -72,8 +125,16 @@ pub fn main() anyerror!void {
             b.draw();
         }
 
+        alien_swarm.move();
+        alien_swarm.draw();
+
         // draw spaceship
-        rl.drawTexture(spaceshipTexture, xPosition, 400, .white);
+        rl.drawTexture(
+            spaceshipTexture,
+            xPosition,
+            @floor(@as(f32, SCREEN_HEIGHT) * 0.9),
+            .white,
+        );
 
         // Draw
         //----------------------------------------------------------------------------------
