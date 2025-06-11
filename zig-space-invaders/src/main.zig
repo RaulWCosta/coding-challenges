@@ -2,10 +2,10 @@ const std = @import("std");
 const rl = @import("raylib");
 const Barrier = @import("barrier.zig").Barrier;
 const alien = @import("alien.zig");
+const Spaceship = @import("spaceship.zig").Spaceship;
 
 const SCREEN_WIDTH: i32 = 1120;
 const SCREEN_HEIGHT: i32 = 800;
-const SPEED_SHIP: i32 = 10;
 
 fn drawTopMenu(score: [:0]const u8) void {
     const menu_height: i32 = @divFloor(SCREEN_HEIGHT, 11);
@@ -81,10 +81,6 @@ pub fn main() anyerror!void {
     rl.setTargetFPS(60); // Set our game to run at 60 frames-per-second
     //--------------------------------------------------------------------------------------
 
-    var xPosition: i32 = 400;
-    const spaceshipTexture = try rl.loadTexture("assets/player.png");
-    defer rl.unloadTexture(spaceshipTexture); // Unload spaceship texture
-
     // Barriers
     const n_barriers: i32 = 5;
     const barrier_y_start: i32 = @floor(@as(f32, SCREEN_HEIGHT) * 0.75);
@@ -103,6 +99,9 @@ pub fn main() anyerror!void {
     var alien_swarm = try alien.AlienSwarm.init();
     defer alien_swarm.deinit(); // Cleanup aliens
 
+    var spaceship = try Spaceship.init();
+    defer spaceship.deinit(); // Cleanup spaceship
+
     // Main game loop
     while (!rl.windowShouldClose()) { // Detect window close button or ESC key
         // Update
@@ -110,31 +109,17 @@ pub fn main() anyerror!void {
         // draw top menu
         drawTopMenu("000000");
 
-        if (rl.isKeyDown(rl.KeyboardKey.left)) {
-            if (xPosition > 60) {
-                xPosition -= SPEED_SHIP;
-            }
-        } else if (rl.isKeyDown(rl.KeyboardKey.right)) {
-            if (xPosition < SCREEN_WIDTH - 130) {
-                xPosition += SPEED_SHIP;
-            }
-        }
+        spaceship.move();
+        alien_swarm.move();
 
         // Draw Barrier
         for (barriers) |b| {
             b.draw();
         }
-
-        alien_swarm.move();
         alien_swarm.draw();
+        spaceship.draw();
 
-        // draw spaceship
-        rl.drawTexture(
-            spaceshipTexture,
-            xPosition,
-            @floor(@as(f32, SCREEN_HEIGHT) * 0.9),
-            .white,
-        );
+        // spaceship.shoot();
 
         // Draw
         //----------------------------------------------------------------------------------
