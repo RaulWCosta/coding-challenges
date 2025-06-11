@@ -1,4 +1,5 @@
 const rl = @import("raylib");
+const BulletManager = @import("bullet.zig").BulletManager;
 
 pub const Barrier = struct {
     xPos: i32,
@@ -48,5 +49,47 @@ pub const Barrier = struct {
         const width = 50;
         const height = 20;
         return (x >= self.xPos and x <= self.xPos + width) and (y >= self.yPos and y <= self.yPos + height);
+    }
+};
+
+pub const BarrierManager = struct {
+    barriers: [5]Barrier,
+    bullets_mng: *BulletManager,
+
+    pub fn init(bullets_mng: *BulletManager) BarrierManager {
+        const _tmp: f32 = @floatFromInt(rl.getScreenHeight());
+        const barrier_y_start: i32 = @intFromFloat(@floor(_tmp * 0.75));
+        const barrier_x_gap: i32 = @divFloor(rl.getScreenWidth(), 5);
+        const barrier_x_start: i32 = 60;
+
+        return BarrierManager{
+            .barriers = [_]Barrier{
+                Barrier.init(barrier_x_start, barrier_y_start),
+                Barrier.init(barrier_x_start + barrier_x_gap, barrier_y_start),
+                Barrier.init(barrier_x_start + 2 * barrier_x_gap, barrier_y_start),
+                Barrier.init(barrier_x_start + 3 * barrier_x_gap, barrier_y_start),
+                Barrier.init(barrier_x_start + 4 * barrier_x_gap, barrier_y_start),
+            },
+            .bullets_mng = bullets_mng,
+        };
+    }
+
+    pub fn update(self: *BarrierManager) void {
+        self.draw();
+    }
+
+    fn draw(self: *const BarrierManager) void {
+        for (self.barriers) |barrier| {
+            barrier.draw();
+        }
+    }
+
+    fn collision(self: *const BarrierManager, x: i32, y: i32) bool {
+        for (self.barriers) |barrier| {
+            if (barrier.collision(x, y)) {
+                return true;
+            }
+        }
+        return false;
     }
 };

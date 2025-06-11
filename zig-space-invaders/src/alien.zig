@@ -1,5 +1,6 @@
 const rl = @import("raylib");
 const std = @import("std");
+const BulletManager = @import("bullet.zig").BulletManager;
 
 const Alien = struct {
     xPos: i32,
@@ -115,7 +116,9 @@ pub const AlienSwarm = struct {
     curr_row_move: usize = 4,
     move_ticks: u8 = 9, // Used to control the movement speed
 
-    pub fn init() rl.RaylibError!AlienSwarm {
+    bullets_mng: *BulletManager,
+
+    pub fn init(bullets_mng: *BulletManager) rl.RaylibError!AlienSwarm {
         const startX = 80;
         const startY = 80;
         const gapY = 60;
@@ -130,6 +133,7 @@ pub const AlienSwarm = struct {
 
         return AlienSwarm{
             .rows = rows,
+            .bullets_mng = bullets_mng,
         };
     }
 
@@ -156,7 +160,12 @@ pub const AlienSwarm = struct {
         }
     }
 
-    pub fn move(self: *AlienSwarm) void {
+    pub fn update(self: *AlienSwarm) void {
+        self.move();
+        self.draw();
+    }
+
+    fn move(self: *AlienSwarm) void {
         if (self.move_ticks == 0) {
             self.rows[self.curr_row_move].move();
             self.update_curr_row_move();
@@ -166,7 +175,7 @@ pub const AlienSwarm = struct {
         }
     }
 
-    pub fn draw(self: AlienSwarm) void {
+    fn draw(self: AlienSwarm) void {
         for (self.rows) |row| {
             row.draw();
         }

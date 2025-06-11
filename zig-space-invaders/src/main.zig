@@ -1,8 +1,9 @@
 const std = @import("std");
 const rl = @import("raylib");
-const Barrier = @import("barrier.zig").Barrier;
+const BarrierManager = @import("barrier.zig").BarrierManager;
 const alien = @import("alien.zig");
 const Spaceship = @import("spaceship.zig").Spaceship;
+const BulletManager = @import("bullet.zig").BulletManager;
 
 const SCREEN_WIDTH: i32 = 1120;
 const SCREEN_HEIGHT: i32 = 800;
@@ -81,54 +82,39 @@ pub fn main() anyerror!void {
     rl.setTargetFPS(60); // Set our game to run at 60 frames-per-second
     //--------------------------------------------------------------------------------------
 
-    // Barriers
-    const n_barriers: i32 = 5;
-    const barrier_y_start: i32 = @floor(@as(f32, SCREEN_HEIGHT) * 0.75);
-    const barrier_x_gap: i32 = @divFloor(SCREEN_WIDTH, n_barriers);
-    const barrier_x_start = 60;
+    // Initialize bullet system
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
 
-    const barriers: [n_barriers]Barrier = .{
-        Barrier.init(barrier_x_start, barrier_y_start),
-        Barrier.init(barrier_x_start + barrier_x_gap, barrier_y_start),
-        Barrier.init(barrier_x_start + 2 * barrier_x_gap, barrier_y_start),
-        Barrier.init(barrier_x_start + 3 * barrier_x_gap, barrier_y_start),
-        Barrier.init(barrier_x_start + 4 * barrier_x_gap, barrier_y_start),
-    };
+    var bullets_mng = try BulletManager.init(allocator);
+    defer bullets_mng.deinit();
+
+    // Barriers
+    var barriers_mng = BarrierManager.init(&bullets_mng);
 
     // Aliens
-    var alien_swarm = try alien.AlienSwarm.init();
+    var alien_swarm = try alien.AlienSwarm.init(&bullets_mng);
     defer alien_swarm.deinit(); // Cleanup aliens
 
-    var spaceship = try Spaceship.init();
+    var spaceship = try Spaceship.init(&bullets_mng);
     defer spaceship.deinit(); // Cleanup spaceship
 
     // Main game loop
     while (!rl.windowShouldClose()) { // Detect window close button or ESC key
-        // Update
-        //----------------------------------------------------------------------------------
-        // draw top menu
-        drawTopMenu("000000");
 
-        spaceship.move();
-        alien_swarm.move();
-
-        // Draw Barrier
-        for (barriers) |b| {
-            b.draw();
-        }
-        alien_swarm.draw();
-        spaceship.draw();
-
-        // spaceship.shoot();
-
-        // Draw
-        //----------------------------------------------------------------------------------
+        // Begin drawing
         rl.beginDrawing();
         defer rl.endDrawing();
+        rl.clearBackground(rl.Color.gray);
 
-        rl.clearBackground(.gray);
+        // Draw top menu
+        drawTopMenu("000000");
 
-        // rl.drawText("Congrats! You created your first window!", 190, 200, 20, .light_gray);
-        //----------------------------------------------------------------------------------
+        // Update game entities
+        spaceship.update();
+        alien_swarm.update();
+        bullets_mng.update();
+        barriers_mng.update();
     }
 }
