@@ -43,6 +43,16 @@ const Alien = struct {
         };
         return rl.checkCollisionRecs(alien_rect, bullet.object);
     }
+
+    fn shoot(self: *Alien, bullets_mng: *BulletManager) void {
+        const _width: f32 = @floatFromInt(self.texture.width);
+        const _height: f32 = @floatFromInt(self.texture.height);
+
+        const bullet_x: i32 = @intFromFloat(_width / 2);
+        const bullet_y: i32 = @intFromFloat(_height / 2);
+
+        bullets_mng.enemy_shoot(bullet_x + self.xPos, bullet_y + self.yPos);
+    }
 };
 
 const AlienRow = struct {
@@ -114,18 +124,17 @@ const AlienRow = struct {
     }
 
     fn collision(self: *AlienRow, bullet: *Bullet) bool {
-        if (!bullet.enabled) return false; // No collision if the bullet is not enabled
+        if (!bullet.enabled) return false;
         for (&self.aliens, 0..) |*alien, i| {
             if (alien.* == null) continue; // Skip null aliens
             if (alien.*.?.collision(bullet)) {
-                // If the bullet collides with an alien, disable the bullet and return the alien
-                bullet.enabled = false; // Disable the bullet
-                self.aliens_count -= 1; // Decrease the count of aliens in the row
+                bullet.enabled = false;
+                self.aliens_count -= 1;
                 self.aliens[i] = null;
-                return true; // Return the collided alien
+                return true;
             }
         }
-        return false; // No collision detected
+        return false;
     }
 };
 
@@ -183,6 +192,23 @@ pub const AlienSwarm = struct {
         self.move();
         self.draw();
         self.collision();
+        self.shoot();
+    }
+
+    fn shoot(self: *AlienSwarm) void {
+        const rand = std.crypto.random;
+
+        // Randomly select an alien from the current row to shoot
+        for (&self.rows) |*row| {
+            if (row.isAlive() and rand.int(u8) < 3) { // 3% chance to shoot
+                const aliens_count: u8 = @intCast(row.aliens_count);
+                const random_index = rand.int(u8) % aliens_count;
+                const alien = &row.aliens[random_index];
+                if (alien.* != null) {
+                    alien.*.?.shoot(self.bullets_mng);
+                }
+            }
+        }
     }
 
     fn move(self: *AlienSwarm) void {

@@ -82,13 +82,7 @@ pub fn main() anyerror!void {
     rl.setTargetFPS(60); // Set our game to run at 60 frames-per-second
     //--------------------------------------------------------------------------------------
 
-    // Initialize bullet system
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
-
-    var bullets_mng = try BulletManager.init(allocator);
-    defer bullets_mng.deinit();
+    var bullets_mng = BulletManager.init();
 
     // Barriers
     var barriers_mng = BarrierManager.init(&bullets_mng);

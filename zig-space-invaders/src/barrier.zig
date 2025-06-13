@@ -60,27 +60,30 @@ pub const Barrier = struct {
         }
     }
 
-    pub fn collision(self: *Barrier, bullet: *Bullet) bool {
-        if ((bullet.x_pos >= self.xPos and bullet.x_pos <= self.xPos + self.width) and (bullet.y_pos >= self.yPos and bullet.y_pos <= self.yPos + self.height)) {
-            for (self.bricks, 0..) |row, i| {
-                for (row, 0..) |brick, j| {
-                    if (brick) |b| {
-                        if (rl.checkCollisionPointRec(
-                            rl.Vector2{
-                                .x = @floatFromInt(bullet.x_pos),
-                                .y = @floatFromInt(bullet.y_pos),
-                            },
-                            b,
-                        )) {
-                            bullet.enabled = false; // Disable the bullet on collision
-                            self.bricks[i][j] = null; // Remove the brick on collision
-                            return true;
-                        }
+    pub fn collision(self: *Barrier, bullet: *Bullet) void {
+        if (bullet.enabled == false) {
+            return;
+        }
+
+        const bullet_x_pos: i32 = @intFromFloat(bullet.object.x);
+        const bullet_y_pos: i32 = @intFromFloat(bullet.object.y);
+
+        if (!(bullet_x_pos >= self.xPos and bullet_x_pos <= self.xPos + self.width) or !(bullet_y_pos >= self.yPos and bullet_y_pos <= self.yPos + self.height)) return;
+
+        for (self.bricks, 0..) |row, i| {
+            for (row, 0..) |brick, j| {
+                if (brick) |b| {
+                    if (rl.checkCollisionRecs(
+                        bullet.object,
+                        b,
+                    )) {
+                        bullet.enabled = false; // Disable the bullet on collision
+                        self.bricks[i][j] = null; // Remove the brick on collision
+                        return;
                     }
                 }
             }
         }
-        return false;
     }
 };
 
@@ -118,14 +121,15 @@ pub const BarrierManager = struct {
     }
 
     fn collision(self: *BarrierManager) void {
-        if (!self.bullets_mng.player_bullet.enabled) {
-            return; // No collision if the bullet is not enabled
-        }
-
         for (&self.barriers) |*barrier| {
-            const collided = barrier.collision(&self.bullets_mng.player_bullet);
-            if (collided) {
-                break;
+            if (self.bullets_mng.player_bullet.enabled) {
+                barrier.collision(&self.bullets_mng.player_bullet);
+            }
+            barrier.collision(&self.bullets_mng.player_bullet);
+
+            for (&self.bullets_mng.enemies_bullets) |*bullet| {
+                if (!bullet.enabled) continue;
+                barrier.collision(bullet);
             }
         }
     }

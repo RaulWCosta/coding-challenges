@@ -1,6 +1,7 @@
 const rl = @import("raylib");
 const std = @import("std");
 const BulletManager = @import("bullet.zig").BulletManager;
+const Bullet = @import("bullet.zig").Bullet;
 
 const SPEED_SHIP: i32 = 10;
 
@@ -9,6 +10,7 @@ pub const Spaceship = struct {
     y_pos: i32,
     width: i32,
     height: i32,
+    lifes: u8 = 30,
     spaceshipTexture: rl.Texture2D,
     shoot_cooldown: i32,
     bullets_mng: *BulletManager,
@@ -36,6 +38,7 @@ pub const Spaceship = struct {
     pub fn update(self: *Spaceship) void {
         self.move();
         self.draw();
+        self.collision(&self.bullets_mng.enemies_bullets);
 
         // Reduce cooldown if it's active
         if (self.shoot_cooldown > 0) {
@@ -44,6 +47,26 @@ pub const Spaceship = struct {
 
         if (rl.isKeyPressed(rl.KeyboardKey.space)) {
             self.shoot();
+        }
+    }
+
+    fn collision(self: *Spaceship, bullets: *[10]Bullet) void {
+        const spaceship_rect = rl.Rectangle{
+            .x = @floatFromInt(self.x_pos),
+            .y = @floatFromInt(self.y_pos),
+            .width = @floatFromInt(self.width),
+            .height = @floatFromInt(self.height),
+        };
+        for (bullets, 0..) |b, i| {
+            if (b.enabled and rl.checkCollisionRecs(spaceship_rect, b.object)) {
+                self.lifes -= 1;
+                if (self.lifes == 0) {
+                    // Handle game over logic here
+                    std.debug.print("Game Over! Spaceship destroyed.", .{});
+                    bullets[i].enabled = false;
+                }
+                break;
+            }
         }
     }
 
@@ -80,7 +103,7 @@ pub const Spaceship = struct {
         const bullet_x = self.x_pos + 30; // Adjust based on spaceship's real width
         const bullet_y = self.y_pos - 10;
 
-        self.bullets_mng.shoot_player(bullet_x, bullet_y);
+        self.bullets_mng.player_shoot(bullet_x, bullet_y);
 
         // Set cooldown to prevent rapid firing
         self.shoot_cooldown = 15; // Adjust this value for desired fire rate
