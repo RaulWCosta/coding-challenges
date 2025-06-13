@@ -1,12 +1,18 @@
 const rl = @import("raylib");
 const BulletManager = @import("bullet.zig").BulletManager;
+const Bullet = @import("bullet.zig").Bullet;
 
 pub const Barrier = struct {
     xPos: i32,
     yPos: i32,
-    format: [7][10]u8,
+    bricks: [7][10]?rl.Rectangle,
+    width: u8,
+    height: u8,
 
     pub fn init(x: i32, y: i32) Barrier {
+        const brick_width: u8 = 10;
+        const brick_height: u8 = 10;
+
         const format: [7][10]u8 = [_][10]u8{
             [_]u8{ ' ', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', ' ' },
             [_]u8{ 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x' },
@@ -17,38 +23,64 @@ pub const Barrier = struct {
             [_]u8{ 'x', 'x', ' ', ' ', ' ', ' ', ' ', ' ', 'x', 'x' },
         };
 
+        var bricks: [7][10]?rl.Rectangle = undefined;
+        for (format, 0..) |row, i| {
+            for (row, 0..) |cell, j| {
+                const _i: i32 = @intCast(i);
+                const _j: i32 = @intCast(j);
+                if (cell == 'x') {
+                    bricks[i][j] = rl.Rectangle{
+                        .x = @floatFromInt(x + _j * brick_width),
+                        .y = @floatFromInt(y + _i * brick_height),
+                        .width = @floatFromInt(brick_width),
+                        .height = @floatFromInt(brick_height),
+                    };
+                } else {
+                    bricks[i][j] = null;
+                }
+            }
+        }
+
         return Barrier{
             .xPos = x,
             .yPos = y,
-            .format = format,
+            .bricks = bricks,
+            .width = 10 * brick_width,
+            .height = 7 * brick_height,
         };
     }
 
     pub fn draw(self: Barrier) void {
-        const width = 10;
-        const height = 10;
-
-        for (self.format, 0..) |row, i| {
-            for (row, 0..) |cell, j| {
-                if (cell == 'x') {
-                    const _i: i32 = @intCast(i);
-                    const _j: i32 = @intCast(j);
-                    rl.drawRectangle(
-                        self.xPos + _j * width,
-                        self.yPos + _i * height,
-                        width,
-                        height,
-                        .blue,
-                    );
+        for (self.bricks) |row| {
+            for (row) |brick| {
+                if (brick) |b| {
+                    rl.drawRectangleRec(b, rl.Color.blue);
                 }
             }
         }
     }
 
-    pub fn collision(self: Barrier, x: i32, y: i32) bool {
-        const width = 50;
-        const height = 20;
-        return (x >= self.xPos and x <= self.xPos + width) and (y >= self.yPos and y <= self.yPos + height);
+    pub fn collision(self: *Barrier, bullet: *Bullet) bool {
+        if ((bullet.x_pos >= self.xPos and bullet.x_pos <= self.xPos + self.width) and (bullet.y_pos >= self.yPos and bullet.y_pos <= self.yPos + self.height)) {
+            for (self.bricks, 0..) |row, i| {
+                for (row, 0..) |brick, j| {
+                    if (brick) |b| {
+                        if (rl.checkCollisionPointRec(
+                            rl.Vector2{
+                                .x = @floatFromInt(bullet.x_pos),
+                                .y = @floatFromInt(bullet.y_pos),
+                            },
+                            b,
+                        )) {
+                            bullet.enabled = false; // Disable the bullet on collision
+                            self.bricks[i][j] = null; // Remove the brick on collision
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
     }
 };
 
@@ -75,6 +107,7 @@ pub const BarrierManager = struct {
     }
 
     pub fn update(self: *BarrierManager) void {
+        self.collision();
         self.draw();
     }
 
@@ -84,12 +117,16 @@ pub const BarrierManager = struct {
         }
     }
 
-    fn collision(self: *const BarrierManager, x: i32, y: i32) bool {
-        for (self.barriers) |barrier| {
-            if (barrier.collision(x, y)) {
-                return true;
+    fn collision(self: *BarrierManager) void {
+        if (!self.bullets_mng.player_bullet.enabled) {
+            return; // No collision if the bullet is not enabled
+        }
+
+        for (&self.barriers) |*barrier| {
+            const collided = barrier.collision(&self.bullets_mng.player_bullet);
+            if (collided) {
+                break;
             }
         }
-        return false;
     }
 };

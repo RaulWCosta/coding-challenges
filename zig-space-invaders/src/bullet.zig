@@ -4,22 +4,22 @@ const std = @import("std");
 pub const Bullet = struct {
     x_pos: i32,
     y_pos: i32,
-    speed: i32,
+    speed: i8,
     direction: i8 = -1, // -1 for up, 1 for down
     object: rl.Rectangle,
     enabled: bool,
 
-    pub fn init(x: i32, y: i32, direction: i8, enabled: bool) Bullet {
+    pub fn init(x: i32, y: i32, direction: i8, speed: i8, enabled: bool) Bullet {
         return Bullet{
             .x_pos = x,
             .y_pos = y,
-            .speed = 15,
+            .speed = speed,
             .direction = direction,
             .object = rl.Rectangle{
                 .x = @floatFromInt(x),
                 .y = @floatFromInt(y),
                 .width = 5,
-                .height = 10,
+                .height = 20,
             },
             .enabled = enabled,
         };
@@ -38,7 +38,7 @@ pub const Bullet = struct {
 
     pub fn isOutOfBounds(self: *const Bullet) bool {
         const screen_height = rl.getScreenHeight();
-        return (self.y_pos < 0) or (self.y_pos > screen_height);
+        return (self.y_pos < @divFloor(screen_height, 10)) or (self.y_pos > screen_height);
     }
 };
 
@@ -48,7 +48,7 @@ pub const BulletManager = struct {
 
     pub fn init(allocator: std.mem.Allocator) !BulletManager {
         return BulletManager{
-            .player_bullet = Bullet.init(0, 0, 0, false),
+            .player_bullet = undefined,
             .enemies_bullets = try std.ArrayList(Bullet).initCapacity(allocator, 10),
         };
     }
@@ -63,7 +63,13 @@ pub const BulletManager = struct {
 
     pub fn shoot_player(self: *BulletManager, x: i32, y: i32) void {
         if (self.player_bullet.enabled) return; // Only one player bullet at a time
-        self.player_bullet = Bullet.init(x, y, -1, true);
+        self.player_bullet = Bullet.init(
+            x,
+            y,
+            -1,
+            10,
+            true,
+        );
     }
 
     pub fn update(self: *BulletManager) void {

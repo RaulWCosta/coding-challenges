@@ -1,6 +1,7 @@
 const rl = @import("raylib");
 const std = @import("std");
 const BulletManager = @import("bullet.zig").BulletManager;
+const Bullet = @import("bullet.zig").Bullet;
 
 const Alien = struct {
     xPos: i32,
@@ -32,13 +33,20 @@ const Alien = struct {
         self.yPos += y_gap;
     }
 
-    // fn isAlive() bool {
-    //     return true;
-    // }
+    fn collision(self: *Alien, bullet: *Bullet) bool {
+        if (!bullet.enabled) return false; // No collision if the bullet is not enabled
+        const alien_rect = rl.Rectangle{
+            .x = @floatFromInt(self.xPos),
+            .y = @floatFromInt(self.yPos),
+            .width = @floatFromInt(self.texture.width),
+            .height = @floatFromInt(self.texture.height),
+        };
+        return rl.checkCollisionRecs(alien_rect, bullet.object);
+    }
 };
 
 const AlienRow = struct {
-    aliens: [11]Alien,
+    aliens: [11]?Alien,
     texture: rl.Texture2D,
     aliens_count: usize = 11,
     down_mov_speed: i8 = 20,
@@ -46,7 +54,7 @@ const AlienRow = struct {
     curr_direction: i8 = 1, // 1 for right, -1 for left
 
     fn init(xPos: i32, yPos: i32, gapX: i32, texture_file: [:0]const u8) rl.RaylibError!AlienRow {
-        var aliens: [11]Alien = undefined;
+        var aliens: [11]?Alien = undefined;
         const texture = try rl.loadTexture(texture_file);
 
         for (&aliens, 0..) |*alien, i| {
@@ -69,9 +77,9 @@ const AlienRow = struct {
 
     fn draw(self: AlienRow) void {
         for (self.aliens) |alien| {
-            // if (alien.isAlive()) {
-            alien.draw();
-            // }
+            if (alien != null) {
+                alien.?.draw();
+            }
         }
     }
 
@@ -79,7 +87,8 @@ const AlienRow = struct {
         var is_move_down: bool = false;
 
         for (self.aliens) |alien| {
-            if (alien.xPos <= 60 or alien.xPos >= (rl.getScreenWidth() - 130)) {
+            if (alien == null) continue; // Skip null aliens
+            if (alien.?.xPos <= 60 or alien.?.xPos >= (rl.getScreenWidth() - 130)) {
                 // If any alien reaches the bottom, the game is over
                 is_move_down = true;
             }
@@ -87,8 +96,9 @@ const AlienRow = struct {
 
         if (is_move_down) {
             for (&self.aliens) |*alien| {
+                if (alien.* == null) continue; // Skip null aliens
                 // Move all aliens down by the down_mov_speed
-                alien.move_down(self.down_mov_speed);
+                alien.*.?.move_down(self.down_mov_speed);
             }
             // Change direction
             self.curr_direction *= -1;
@@ -98,16 +108,25 @@ const AlienRow = struct {
         }
         // Move all aliens in the row by the given speed
         for (&self.aliens) |*alien| {
-            alien.move_side(self.mov_speed, self.curr_direction);
+            if (alien.* == null) continue; // Skip null aliens
+            alien.*.?.move_side(self.mov_speed, self.curr_direction);
         }
     }
 
-    // fn move_down(self: AlienRow) void {
-    //     // Move all aliens in the row down by a fixed amount
-    //     for (self.aliens) |*alien| {
-    //         alien.yPos += self.gapY;
-    //     }
-    // }
+    fn collision(self: *AlienRow, bullet: *Bullet) bool {
+        if (!bullet.enabled) return false; // No collision if the bullet is not enabled
+        for (&self.aliens, 0..) |*alien, i| {
+            if (alien.* == null) continue; // Skip null aliens
+            if (alien.*.?.collision(bullet)) {
+                // If the bullet collides with an alien, disable the bullet and return the alien
+                bullet.enabled = false; // Disable the bullet
+                self.aliens_count -= 1; // Decrease the count of aliens in the row
+                self.aliens[i] = null;
+                return true; // Return the collided alien
+            }
+        }
+        return false; // No collision detected
+    }
 };
 
 pub const AlienSwarm = struct {
@@ -163,6 +182,7 @@ pub const AlienSwarm = struct {
     pub fn update(self: *AlienSwarm) void {
         self.move();
         self.draw();
+        self.collision();
     }
 
     fn move(self: *AlienSwarm) void {
@@ -178,6 +198,15 @@ pub const AlienSwarm = struct {
     fn draw(self: AlienSwarm) void {
         for (self.rows) |row| {
             row.draw();
+        }
+    }
+
+    fn collision(self: *AlienSwarm) void {
+        const player_bullet = &self.bullets_mng.player_bullet;
+        for (&self.rows) |*row| {
+            if (row.collision(player_bullet)) {
+                return;
+            }
         }
     }
 };
