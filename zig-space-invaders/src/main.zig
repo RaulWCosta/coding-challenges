@@ -8,7 +8,10 @@ const BulletManager = @import("bullet.zig").BulletManager;
 const SCREEN_WIDTH: i32 = 1120;
 const SCREEN_HEIGHT: i32 = 800;
 
-fn drawTopMenu(score: [:0]const u8) void {
+fn drawTopMenu(score: u32, lives: u8) !void {
+    std.debug.print("Score: {}, Lives: {}", .{ score, lives });
+
+    // const print_score = std.fmt.format("{:06}", .{score});
     const menu_height: i32 = @divFloor(SCREEN_HEIGHT, 11);
     const menu_width: i32 = SCREEN_WIDTH;
     const font_size: i32 = @divFloor(menu_height, 2);
@@ -23,9 +26,10 @@ fn drawTopMenu(score: [:0]const u8) void {
         .white,
     );
 
+    var buf: [7]u8 = undefined;
     rl.drawText(
-        score,
-        @divFloor(menu_width, 5) + 90,
+        try std.fmt.bufPrintZ(&buf, "{:0>6}", .{score}),
+        @divFloor(menu_width, 4) + 80,
         @divFloor(menu_height, 2) - 10,
         font_size,
         .green,
@@ -41,28 +45,18 @@ fn drawTopMenu(score: [:0]const u8) void {
         .white,
     );
 
-    const x_pos_first_life: i32 = half + 140;
-    rl.drawRectangle(
-        x_pos_first_life,
-        @divFloor(menu_height, 2) - 10,
-        20,
-        20,
-        .green,
-    );
-    rl.drawRectangle(
-        x_pos_first_life + 30,
-        @divFloor(menu_height, 2) - 10,
-        20,
-        20,
-        .green,
-    );
-    rl.drawRectangle(
-        x_pos_first_life + 60,
-        @divFloor(menu_height, 2) - 10,
-        20,
-        20,
-        .green,
-    );
+    const x_pos_first_life: i32 = half + 160;
+
+    for (0..lives) |i| {
+        const _i: i32 = @intCast(i);
+        rl.drawRectangle(
+            x_pos_first_life + _i * 40,
+            @divFloor(menu_height, 2) - 6,
+            25,
+            25,
+            .green,
+        );
+    }
 }
 
 pub fn main() anyerror!void {
@@ -93,6 +87,7 @@ pub fn main() anyerror!void {
 
     var spaceship = try Spaceship.init(&bullets_mng);
     defer spaceship.deinit(); // Cleanup spaceship
+    var current_player_score: u32 = 0;
 
     // Main game loop
     while (!rl.windowShouldClose()) { // Detect window close button or ESC key
@@ -103,13 +98,14 @@ pub fn main() anyerror!void {
         rl.clearBackground(rl.Color.gray);
 
         // Draw top menu
-        drawTopMenu("000000");
+        try drawTopMenu(current_player_score, spaceship.lifes);
 
         // Update game entities
         const player_dead = spaceship.update();
-        const aliens_dead = alien_swarm.update();
+        const aliens_update = alien_swarm.update();
+        current_player_score = aliens_update.player_score;
 
-        if (player_dead or aliens_dead) {
+        if (player_dead or aliens_update.is_game_over) {
             break;
         }
 

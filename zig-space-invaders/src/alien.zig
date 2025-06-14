@@ -4,6 +4,11 @@ const BulletManager = @import("bullet.zig").BulletManager;
 const Bullet = @import("bullet.zig").Bullet;
 const utils = @import("utils.zig");
 
+const AlienUpdateStatus = struct {
+    is_game_over: bool,
+    player_score: u32,
+};
+
 const Alien = struct {
     xPos: i32,
     yPos: i32,
@@ -65,8 +70,9 @@ const AlienRow = struct {
     mov_speed: i8 = 10,
     curr_direction: i8 = 1, // 1 for right, -1 for left
     screen_bottom: i32,
+    score: u32, // Default score for the row
 
-    fn init(xPos: i32, yPos: i32, gapX: i32, texture_file: [:0]const u8) rl.RaylibError!AlienRow {
+    fn init(xPos: i32, yPos: i32, gapX: i32, texture_file: [:0]const u8, score: u32) rl.RaylibError!AlienRow {
         var aliens: [11]Alien = undefined;
         const texture = try rl.loadTexture(texture_file);
 
@@ -78,6 +84,7 @@ const AlienRow = struct {
             .aliens = aliens,
             .texture = texture,
             .screen_bottom = utils.getScreenBottom(),
+            .score = score,
         };
     }
 
@@ -152,6 +159,8 @@ pub const AlienSwarm = struct {
 
     bullets_mng: *BulletManager,
 
+    current_player_score: u32 = 0,
+
     pub fn init(bullets_mng: *BulletManager) rl.RaylibError!AlienSwarm {
         const startX = 80;
         const startY = 80;
@@ -159,11 +168,11 @@ pub const AlienSwarm = struct {
         const gapX = 70;
 
         var rows: [5]AlienRow = undefined;
-        rows[0] = try AlienRow.init(startX, startY, gapX, "assets/red.png");
-        rows[1] = try AlienRow.init(startX, startY + (1 * gapY), gapX, "assets/red.png");
-        rows[2] = try AlienRow.init(startX, startY + (2 * gapY), gapX, "assets/yellow.png");
-        rows[3] = try AlienRow.init(startX, startY + (3 * gapY), gapX, "assets/yellow.png");
-        rows[4] = try AlienRow.init(startX, startY + (4 * gapY), gapX, "assets/green.png");
+        rows[0] = try AlienRow.init(startX, startY, gapX, "assets/red.png", 300);
+        rows[1] = try AlienRow.init(startX, startY + (1 * gapY), gapX, "assets/red.png", 300);
+        rows[2] = try AlienRow.init(startX, startY + (2 * gapY), gapX, "assets/yellow.png", 200);
+        rows[3] = try AlienRow.init(startX, startY + (3 * gapY), gapX, "assets/yellow.png", 200);
+        rows[4] = try AlienRow.init(startX, startY + (4 * gapY), gapX, "assets/green.png", 100);
 
         return AlienSwarm{
             .rows = rows,
@@ -203,22 +212,31 @@ pub const AlienSwarm = struct {
         }
     }
 
-    pub fn update(self: *AlienSwarm) bool {
+    pub fn update(self: *AlienSwarm) AlienUpdateStatus {
         if (self.allAliensDead()) {
             std.debug.print("All aliens are dead. Resetting current row to move.\n", .{});
-            return true;
+            return AlienUpdateStatus{
+                .is_game_over = true,
+                .player_score = self.current_player_score,
+            };
         }
 
         const reached_bottom = self.move();
         if (reached_bottom) {
             std.debug.print("Aliens reached the bottom. Game over!\n", .{});
-            return true; // Game over condition
+            return AlienUpdateStatus{
+                .is_game_over = true,
+                .player_score = self.current_player_score,
+            };
         }
 
         self.draw();
         self.collision();
         self.shoot();
-        return false;
+        return AlienUpdateStatus{
+            .is_game_over = false,
+            .player_score = self.current_player_score,
+        };
     }
 
     fn shoot(self: *AlienSwarm) void {
@@ -260,6 +278,7 @@ pub const AlienSwarm = struct {
         for (&self.rows) |*row| {
             if (row.collision(player_bullet)) {
                 self.alien_shoot_probability += self.alien_shoot_prob_delta;
+                self.current_player_score += row.score;
                 return;
             }
         }
