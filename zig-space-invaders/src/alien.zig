@@ -143,6 +143,8 @@ pub const AlienSwarm = struct {
 
     curr_row_move: usize = 4,
     move_ticks: u8 = 9, // Used to control the movement speed
+    alien_shoot_probability: f16 = 3.0,
+    alien_shoot_prob_delta: f16 = 0.3,
 
     bullets_mng: *BulletManager,
 
@@ -213,9 +215,9 @@ pub const AlienSwarm = struct {
     fn shoot(self: *AlienSwarm) void {
         const rand = std.crypto.random;
 
-        // Randomly select an alien from the current row to shoot
+        const shoot_prob: u8 = @intFromFloat(@floor(self.alien_shoot_probability));
         for (&self.rows) |*row| {
-            if (row.isAlive() and rand.int(u8) < 3) {
+            if (row.isAlive() and rand.int(u8) < shoot_prob) {
                 const aliens_count: u8 = @intCast(row.aliens_count);
                 const random_index = rand.int(u8) % aliens_count;
                 const alien = &row.aliens[random_index];
@@ -246,6 +248,7 @@ pub const AlienSwarm = struct {
         const player_bullet = &self.bullets_mng.player_bullet;
         for (&self.rows) |*row| {
             if (row.collision(player_bullet)) {
+                self.alien_shoot_probability += self.alien_shoot_prob_delta;
                 return;
             }
         }
