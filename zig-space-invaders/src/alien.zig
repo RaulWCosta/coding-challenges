@@ -171,6 +171,15 @@ pub const AlienSwarm = struct {
         }
     }
 
+    fn allAliensDead(self: *AlienSwarm) bool {
+        for (self.rows) |row| {
+            if (row.isAlive()) {
+                return false; // At least one row is still alive
+            }
+        }
+        return true; // All rows are dead
+    }
+
     fn update_curr_row_move(self: *AlienSwarm) void {
         // Update the current row to move based on the movement speed
         while (true) {
@@ -188,11 +197,17 @@ pub const AlienSwarm = struct {
         }
     }
 
-    pub fn update(self: *AlienSwarm) void {
+    pub fn update(self: *AlienSwarm) bool {
+        if (self.allAliensDead()) {
+            std.debug.print("All aliens are dead. Resetting current row to move.\n", .{});
+            return true;
+        }
+
         self.move();
         self.draw();
         self.collision();
         self.shoot();
+        return false;
     }
 
     fn shoot(self: *AlienSwarm) void {
@@ -200,7 +215,7 @@ pub const AlienSwarm = struct {
 
         // Randomly select an alien from the current row to shoot
         for (&self.rows) |*row| {
-            if (row.isAlive() and rand.int(u8) < 3) { // 3% chance to shoot
+            if (row.isAlive() and rand.int(u8) < 3) {
                 const aliens_count: u8 = @intCast(row.aliens_count);
                 const random_index = rand.int(u8) % aliens_count;
                 const alien = &row.aliens[random_index];

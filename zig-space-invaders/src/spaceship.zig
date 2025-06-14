@@ -10,7 +10,7 @@ pub const Spaceship = struct {
     y_pos: i32,
     width: i32,
     height: i32,
-    lifes: u8 = 30,
+    lifes: u8 = 3,
     spaceshipTexture: rl.Texture2D,
     shoot_cooldown: i32,
     bullets_mng: *BulletManager,
@@ -35,19 +35,13 @@ pub const Spaceship = struct {
         rl.unloadTexture(self.spaceshipTexture); // Unload spaceship texture
     }
 
-    pub fn update(self: *Spaceship) void {
+    pub fn update(self: *Spaceship) bool {
         self.move();
         self.draw();
+        self.shoot();
         self.collision(&self.bullets_mng.enemies_bullets);
 
-        // Reduce cooldown if it's active
-        if (self.shoot_cooldown > 0) {
-            self.shoot_cooldown -= 1;
-        }
-
-        if (rl.isKeyPressed(rl.KeyboardKey.space)) {
-            self.shoot();
-        }
+        return (self.lifes == 0);
     }
 
     fn collision(self: *Spaceship, bullets: *[10]Bullet) void {
@@ -60,11 +54,7 @@ pub const Spaceship = struct {
         for (bullets, 0..) |b, i| {
             if (b.enabled and rl.checkCollisionRecs(spaceship_rect, b.object)) {
                 self.lifes -= 1;
-                if (self.lifes == 0) {
-                    // Handle game over logic here
-                    std.debug.print("Game Over! Spaceship destroyed.", .{});
-                    bullets[i].enabled = false;
-                }
+                bullets[i].enabled = false;
                 break;
             }
         }
@@ -92,12 +82,21 @@ pub const Spaceship = struct {
         );
     }
 
-    pub fn canShoot(self: *const Spaceship) bool {
+    fn canShoot(self: *const Spaceship) bool {
         return self.shoot_cooldown <= 0;
     }
 
-    pub fn shoot(self: *Spaceship) void {
+    fn shoot(self: *Spaceship) void {
+
+        // Reduce cooldown if it's active
+        if (self.shoot_cooldown > 0) {
+            self.shoot_cooldown -= 1;
+        }
         if (!self.canShoot()) return;
+
+        if (!rl.isKeyPressed(rl.KeyboardKey.space)) {
+            return;
+        }
 
         // Create a bullet at the center-top of the spaceship
         const bullet_x = self.x_pos + 30; // Adjust based on spaceship's real width

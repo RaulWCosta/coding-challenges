@@ -106,9 +106,18 @@ pub fn main() anyerror!void {
         drawTopMenu("000000");
 
         // Update game entities
-        spaceship.update();
-        alien_swarm.update();
+        const player_dead = spaceship.update();
+        const aliens_dead = alien_swarm.update();
+
+        if (player_dead or aliens_dead) {
+            break;
+        }
+
         bullets_mng.update();
         barriers_mng.update();
     }
+
+    std.debug.print("Game over!", .{});
+    // std.time.sleep(std.time.ns_per_s * 2); // Sleep for a second before exiting
+    rl.closeWindow(); // Close window and OpenGL context
 }
