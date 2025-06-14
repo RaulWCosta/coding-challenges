@@ -7,6 +7,7 @@ const Alien = struct {
     xPos: i32,
     yPos: i32,
     texture: rl.Texture2D,
+    is_alive: bool = true,
 
     fn init(x: i32, y: i32, texture: rl.Texture2D) Alien {
         return Alien{
@@ -56,7 +57,7 @@ const Alien = struct {
 };
 
 const AlienRow = struct {
-    aliens: [11]?Alien,
+    aliens: [11]Alien,
     texture: rl.Texture2D,
     aliens_count: usize = 11,
     down_mov_speed: i8 = 20,
@@ -64,7 +65,7 @@ const AlienRow = struct {
     curr_direction: i8 = 1, // 1 for right, -1 for left
 
     fn init(xPos: i32, yPos: i32, gapX: i32, texture_file: [:0]const u8) rl.RaylibError!AlienRow {
-        var aliens: [11]?Alien = undefined;
+        var aliens: [11]Alien = undefined;
         const texture = try rl.loadTexture(texture_file);
 
         for (&aliens, 0..) |*alien, i| {
@@ -87,8 +88,8 @@ const AlienRow = struct {
 
     fn draw(self: AlienRow) void {
         for (self.aliens) |alien| {
-            if (alien != null) {
-                alien.?.draw();
+            if (alien.is_alive) {
+                alien.draw();
             }
         }
     }
@@ -97,8 +98,7 @@ const AlienRow = struct {
         var is_move_down: bool = false;
 
         for (self.aliens) |alien| {
-            if (alien == null) continue; // Skip null aliens
-            if (alien.?.xPos <= 60 or alien.?.xPos >= (rl.getScreenWidth() - 130)) {
+            if (alien.xPos <= 60 or alien.xPos >= (rl.getScreenWidth() - 130)) {
                 // If any alien reaches the bottom, the game is over
                 is_move_down = true;
             }
@@ -106,9 +106,7 @@ const AlienRow = struct {
 
         if (is_move_down) {
             for (&self.aliens) |*alien| {
-                if (alien.* == null) continue; // Skip null aliens
-                // Move all aliens down by the down_mov_speed
-                alien.*.?.move_down(self.down_mov_speed);
+                alien.move_down(self.down_mov_speed);
             }
             // Change direction
             self.curr_direction *= -1;
@@ -118,19 +116,18 @@ const AlienRow = struct {
         }
         // Move all aliens in the row by the given speed
         for (&self.aliens) |*alien| {
-            if (alien.* == null) continue; // Skip null aliens
-            alien.*.?.move_side(self.mov_speed, self.curr_direction);
+            alien.move_side(self.mov_speed, self.curr_direction);
         }
     }
 
     fn collision(self: *AlienRow, bullet: *Bullet) bool {
         if (!bullet.enabled) return false;
         for (&self.aliens, 0..) |*alien, i| {
-            if (alien.* == null) continue; // Skip null aliens
-            if (alien.*.?.collision(bullet)) {
+            if (!alien.is_alive) continue; // Skip dead aliens
+            if (alien.collision(bullet)) {
                 bullet.enabled = false;
                 self.aliens_count -= 1;
-                self.aliens[i] = null;
+                self.aliens[i].is_alive = false;
                 return true;
             }
         }
@@ -221,8 +218,8 @@ pub const AlienSwarm = struct {
                 const aliens_count: u8 = @intCast(row.aliens_count);
                 const random_index = rand.int(u8) % aliens_count;
                 const alien = &row.aliens[random_index];
-                if (alien.* != null) {
-                    alien.*.?.shoot(self.bullets_mng);
+                if (alien.is_alive) {
+                    alien.shoot(self.bullets_mng);
                 }
             }
         }
