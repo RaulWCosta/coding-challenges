@@ -2,6 +2,7 @@ const rl = @import("raylib");
 const std = @import("std");
 const BulletManager = @import("bullet.zig").BulletManager;
 const Bullet = @import("bullet.zig").Bullet;
+const utils = @import("utils.zig");
 
 const Alien = struct {
     xPos: i32,
@@ -63,6 +64,7 @@ const AlienRow = struct {
     down_mov_speed: i8 = 20,
     mov_speed: i8 = 10,
     curr_direction: i8 = 1, // 1 for right, -1 for left
+    screen_bottom: i32,
 
     fn init(xPos: i32, yPos: i32, gapX: i32, texture_file: [:0]const u8) rl.RaylibError!AlienRow {
         var aliens: [11]Alien = undefined;
@@ -75,6 +77,7 @@ const AlienRow = struct {
         return AlienRow{
             .aliens = aliens,
             .texture = texture,
+            .screen_bottom = utils.getScreenBottom(),
         };
     }
 
@@ -94,7 +97,7 @@ const AlienRow = struct {
         }
     }
 
-    fn move(self: *AlienRow) void {
+    fn move(self: *AlienRow) bool {
         var is_move_down: bool = false;
 
         for (self.aliens) |alien| {
@@ -107,17 +110,21 @@ const AlienRow = struct {
         if (is_move_down) {
             for (&self.aliens) |*alien| {
                 alien.move_down(self.down_mov_speed);
+                if (alien.yPos >= (self.screen_bottom)) {
+                    return true; // Aliens reached the bottom
+                }
             }
             // Change direction
             self.curr_direction *= -1;
 
             // update the movement speed
-            self.mov_speed += 1;
+            self.mov_speed += 2;
         }
         // Move all aliens in the row by the given speed
         for (&self.aliens) |*alien| {
             alien.move_side(self.mov_speed, self.curr_direction);
         }
+        return false;
     }
 
     fn collision(self: *AlienRow, bullet: *Bullet) bool {
@@ -202,7 +209,12 @@ pub const AlienSwarm = struct {
             return true;
         }
 
-        self.move();
+        const reached_bottom = self.move();
+        if (reached_bottom) {
+            std.debug.print("Aliens reached the bottom. Game over!\n", .{});
+            return true; // Game over condition
+        }
+
         self.draw();
         self.collision();
         self.shoot();
@@ -225,14 +237,16 @@ pub const AlienSwarm = struct {
         }
     }
 
-    fn move(self: *AlienSwarm) void {
+    fn move(self: *AlienSwarm) bool {
         if (self.move_ticks == 0) {
-            self.rows[self.curr_row_move].move();
+            const reached_bottom = self.rows[self.curr_row_move].move();
             self.update_curr_row_move();
             self.move_ticks = 9; // Reset the move ticks
+            return reached_bottom;
         } else {
             self.move_ticks -= 1;
         }
+        return false;
     }
 
     fn draw(self: AlienSwarm) void {

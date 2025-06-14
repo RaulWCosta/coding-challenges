@@ -1,6 +1,7 @@
 const rl = @import("raylib");
 const BulletManager = @import("bullet.zig").BulletManager;
 const Bullet = @import("bullet.zig").Bullet;
+const utils = @import("utils.zig");
 
 pub const Barrier = struct {
     xPos: i32,
@@ -92,8 +93,7 @@ pub const BarrierManager = struct {
     bullets_mng: *BulletManager,
 
     pub fn init(bullets_mng: *BulletManager) BarrierManager {
-        const _tmp: f32 = @floatFromInt(rl.getScreenHeight());
-        const barrier_y_start: i32 = @intFromFloat(@floor(_tmp * 0.75));
+        const barrier_y_start: i32 = utils.getScreenBottom() + 40;
         const barrier_x_gap: i32 = @divFloor(rl.getScreenWidth(), 5);
         const barrier_x_start: i32 = 60;
 
